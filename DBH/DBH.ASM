@@ -3,11 +3,11 @@
 org 100h
 
 FrameHeight	equ 7
-FrameWidth	equ 16
+FrameWidth	equ 21
 FrameRow	equ 10
 FrameCol	equ 39
 
-FrameAttr	equ 1Fh
+FrameAttr	equ 4Fh
 FrameShadow	equ 00001000b
 
 FrameUpSta	equ 201
@@ -51,6 +51,15 @@ Start:
 	mov 	al, 3
 	int 	10h
 
+	mov 	si, 82h
+	call 	adjustString
+	call 	readNumber
+	save <bx> ; read number
+
+	mov 	cx, 1
+	mov 	di, offset numberBuffer
+	call 	printNumber
+
 	mov 	si, ScreenFill
 	call	fillScreen
 	
@@ -60,24 +69,89 @@ Start:
 	mov 	dh, FrameWidth
 	call	printEnlargingFrame
 
-	
-	; Read file
+	modalW = 9
+	modalH = 2
+	int 3
+
+	save <di> ; first modal
+	;mov 	si, 1
+	mov 	bl, modalH
+	mov 	bh, modalW
+	call 	printFrame
 	save <di>
+	mov 	dx, modalW * 2
+	mov 	cx, modalH * 2 - 1
 	mov 	si, 82h
-	mov 	di, offset fileName
-	call	ASCIIFname
-
-
-	mov 	dx, di
-	mov 	cx, MsgSize - 2
-	mov 	di, Message
-	call 	retrieveFile
-	rest <di>
-
-	mov 	dx, FrameWidth * 2
-	mov 	si, Message
-	mov 	cx, FrameHeight * 2 - 1
 	call	printStringVram
+	rest <di>
+	add 	di, ScreenW * 2
+	mov 	si, offset decNote
+	call 	printStringVram
+	rest <di, bx>
+
+	save <bx, di> ; second modal
+	add 	di, (FrameWidth) * 2
+	mov 	bl, modalH
+	mov 	bh, modalW
+	;mov 	si, 1
+	call 	printFrame
+
+	save <di>
+	mov 	dx, modalW * 2
+	mov 	cx, modalH * 2 - 1
+	mov 	si, offset numberBuffer
+	call	printStringVram
+	rest <di>
+	add 	di, ScreenW * 2
+	mov 	si, offset binNote
+	call 	printStringVram
+	rest <di, bx>
+
+	save <bx, di>
+	mov 	cx, 3
+	mov 	di, offset numberBuffer
+	call 	printNumber
+	rest <di, bx>
+
+	save <bx, di> ; third modal
+	add 	di, (FrameWidth) * 2 + (ScreenW) * 2 * (modalH * 2)
+	mov 	bl, modalH
+	mov 	bh, modalW
+	;mov 	si, 1
+	call 	printFrame
+	save <di>
+	mov 	dx, modalW * 2
+	mov 	cx, modalH * 2 - 1
+	mov 	si, offset numberBuffer
+	call	printStringVram
+	rest <di>
+	add 	di, ScreenW * 2
+	mov 	si, offset octNote
+	call 	printStringVram
+	rest <di, bx>
+
+	save <bx, di>
+	mov 	cx, 4
+	mov 	di, offset numberBuffer
+	call 	printNumber
+	rest <di, bx>
+
+	save <bx, di> ; forth modal
+	add 	di, (FrameWidth) * 2 + (ScreenW) * 2 * (2 * (modalH * 2))
+	mov 	bl, modalH
+	mov 	bh, modalW
+	;mov 	si, 1
+	call 	printFrame
+	save <di>
+	mov 	dx, modalW * 2
+	mov 	cx, modalH * 2 - 1
+	mov 	si, offset numberBuffer
+	call	printStringVram
+	rest <di>
+	add 	di, ScreenW * 2
+	mov 	si, offset hexNote
+	call 	printStringVram
+	rest <di, bx>
 
 	mov 	cx, 5Fh
 	mov 	dx, 2240h
@@ -85,6 +159,120 @@ Start:
 	
 	mov 	ax, 4c00h
 	int 	21h
+
+; Prints number to desired string
+; in selected base (must be 2^power)
+; ================
+; bx - number
+; cx - power
+; di - string buffer
+printNumber proc
+	save <ax, bx, cx, di, dx>
+	save <ax>
+	xor 	dx, dx
+	mov 	ax, 16
+	div 	cx
+	mov 	dx, ax
+	rest <ax>
+	charByChar:
+		save <dx>
+		mov 	ax, bx
+		shl 	bx, cl
+		call 	getUpperMask
+		and 	ax, dx
+		rol 	ax, cl
+
+		cmp 	ax, 10
+		jl  	setLetter
+		add 	ax, 7
+		setLetter:
+		add	ax, '0'
+		stosb
+		rest <dx>
+		dec 	dx
+	cmp 	dx, 0
+	jne 	charByChar
+	mov 	ax, '$'
+	stosb
+	rest <dx, di, cx, bx, ax>
+	ret
+endp
+
+; Mash of cx last bits
+; ================
+; cx - power
+; ================
+; dx - mask
+getUpperMask proc
+	xor 	dx, dx
+	save <cx, bx>
+	mov 	bx, 16
+	sub 	bx, cx
+	mov 	cx, bx
+	getMaskLoop:
+		shl 	dx, 1
+		inc 	dx
+	loop getMaskLoop
+	not 	dx
+	rest <bx, cx>
+	ret
+endp
+
+; Sets '$' to the first encountered space
+; or unprintable symbol
+; ================
+; si - string
+; ================
+; modifies memory
+adjustString proc
+	save <ax, si>
+	adjustStringLoop:
+		lodsb
+		cmp 	al, ' '
+		je  	adjustStringLoopEnd
+		cmp  	al, '$'
+		je  	adjustStringLoopEnd
+		cmp  	al, 127
+		jae  	adjustStringLoopEnd
+		cmp 	al, 16
+		jbe 	adjustStringLoopEnd
+		je adjustStringLoopEnd
+
+	jmp adjustStringLoop
+	adjustStringLoopEnd:
+	mov 	[si - 1], '$'
+	rest <si, ax>
+	ret
+endp
+
+; Read number from $-terminated string
+; ================
+; si - string
+; ================
+; bx -  number
+readNumber proc
+	save <si, ax, dx, cx>
+	xor 	bx, bx
+	xor	ax, ax
+	mov 	cx, 10
+	readNumberLoop:
+		lodsb
+		cmp 	ax, '$'
+		je  	readNumberLoopEnd
+		
+		save <ax>
+		mov 	ax, bx
+		mul 	cx
+		mov 	bx, ax
+		rest <ax>
+		
+		sub 	ax, '0'
+		add 	bx, ax
+	jmp 	readNumberLoop
+	readNumberLoopEnd:
+	rest <cx, dx, ax, si>
+	ret
+endp
 
 ; Get file content
 ; ================
@@ -219,6 +407,8 @@ endp
 ; ah for col coordinate of center
 ; dl for half height 
 ; dh for half width
+; ================
+; di position inside frame
 printEnlargingFrame proc	
 	save <si, bx, cx>
 
@@ -268,7 +458,7 @@ printEnlargingFrame proc
 		noWidthtEnl:
 		rest <dx>
 
-		call 	printFrame
+		call 	printCenterFrame
 
 		save <cx, dx>
 		mov 	cx, 03h
@@ -302,50 +492,35 @@ endp
 ; si = 1 -> shadow
 ; ================
 ; di position inside frame
+printCenterFrame proc
+	save <bx>
+	sub 	bx, 0101h ; sub borders
+	call 	doubleHW ; -> bl, bh
+	call 	calcStartXY ; -> di
+	rest <bx>
+	call 	printFrame
+	ret
+endp
+
+; Displays frame
+; ================
+; di for start position
+; bl for half height 
+; bh for half width
+; si = 1 -> shadow
+; ================
+; di position inside frame
 printFrame proc
 	save <es, ax, bx, cx, dx>
+	save <di>
 	sub 	bx, 0101h ; sub borders
-
-	save <ax, cx>
+	save <ax>
 	mov 	ax, VramOffset
 	mov 	es, ax
-	xor 	ax, ax
-	mov 	al, bl	; ax = half height
-	add 	ax, ax	; ax = height
-	mov 	bl, al	; bl = height
-
-	xor 	ax, ax
-	mov 	al, bh	; ax = half width
-	add 	ax, ax	; ax = width
-	mov 	bh, al	; bh = width
-	rest <cx, ax>
-
-	save <ax, bx, dx>
-	xor 	ah, ah	; ax = row coordinate
-	add 	ax, ax	; ax = row * 2
-
-	xor 	bh, bh	; bx = half height
-	sub 	ax, bx	; ax = row * 2 - h
-
-	mov 	bx, ScreenW
-	mul 	bx 	; ax = 80 * (row * 2 - h)
-
-	mov 	bx, sp
-	mov 	di, ax
-
-	mov 	ax, [bx + 4]	; ax restored
-	mov 	al, ah	
-	xor 	ah, ah
-	add 	ax, ax ; ax = col * 2
-
-	mov 	dx, [bx + 2]	; bx restored
-	mov 	dl, dh 
-	xor 	dh, dh	; dx = width
-	sub 	ax, dx
-	add 	di, ax
-	; di = 80 * (row * 2 - h) + col * 2 - w	
-	rest <dx, bx, ax>
-
+	rest <ax>
+	
+	call doubleHW ; -> bl, bh
+	rest <di>
 	save <di>
 
 	save <ax>
@@ -353,7 +528,7 @@ printFrame proc
 	xor 	ah, ah
 	mov 	dx, ax	; dx = row length
 	rest <ax>
-
+	
 	save <bx>
 	mov 	al, FrameUpSta	; left symbol
 	mov 	ah, FrameUpEnd	; right symbol
@@ -418,6 +593,66 @@ printFrame proc
 	ret
 endp
 
+; Doubles height and width
+; ================
+; bl for half height 
+; bh for half width
+; ================
+; bl for height 
+; bh for width
+doubleHW proc
+	save <ax, cx>
+	xor 	ax, ax
+	mov 	al, bl	; ax = half height
+	add 	ax, ax	; ax = height
+	mov 	bl, al	; bl = height
+
+	xor 	ax, ax
+	mov 	al, bh	; ax = half width
+	add 	ax, ax	; ax = width
+	mov 	bh, al	; bh = width
+	rest <cx, ax>
+	ret
+endp
+
+; Calculates position of
+; left upper corner
+; ================
+; al for row coordinate of center
+; ah for col coordinate of center
+; bl for height 
+; bh for width
+; ================
+; di position of left upper corner
+calcStartXY proc
+	save <ax, bx, dx>
+	xor 	ah, ah	; ax = row coordinate
+	add 	ax, ax	; ax = row * 2
+
+	xor 	bh, bh	; bx = half height
+	sub 	ax, bx	; ax = row * 2 - h
+
+	mov 	bx, ScreenW
+	mul 	bx 	; ax = 80 * (row * 2 - h)
+
+	mov 	bx, sp
+	mov 	di, ax
+
+	mov 	ax, [bx + 4]	; ax restored
+	mov 	al, ah	
+	xor 	ah, ah
+	add 	ax, ax ; ax = col * 2
+
+	mov 	dx, [bx + 2]	; bx restored
+	mov 	dl, dh 
+	xor 	dh, dh	; dx = width
+	sub 	ax, dx
+	add 	di, ax
+	; di = 80 * (row * 2 - h) + col * 2 - w	
+	rest <dx, bx, ax>
+	ret
+endp
+
 ; Displays frame one row
 ; ================
 ; al for start symbol
@@ -475,7 +710,13 @@ fillScreen proc
 endp
 
 Msg 		db MsgSize DUP(0), '$'
-fileName	db FNameSize DUP(0)
-errFileReadMsg db 'Cannot open the file', '$'
+fileName	db FNameSize DUP(0), '$'
+numberBuffer	db 16 DUP(0), '$'
+errFileReadMsg	db 'Cannot open the file', '$'
+
+decNote 	db 'decimal', '$'
+hexNote 	db 'hexadecimal', '$'
+octNote 	db 'octal', '$'
+binNote 	db 'binary', '$'
 
 End 	Start
