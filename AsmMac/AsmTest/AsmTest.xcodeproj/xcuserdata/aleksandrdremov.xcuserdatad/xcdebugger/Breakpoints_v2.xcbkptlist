@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bucket
+   uuid = "F5827318-EC57-45B4-BB4D-9FBDBABCB2EB"
+   type = "1"
+   version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.AddressBreakpoint">
+         <BreakpointContent
+            uuid = "129F2A4B-4386-41E9-9661-29442492BE36"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            symbolName = "*0x100003f34">
+            <Locations>
+               <Location
+                  uuid = "129F2A4B-4386-41E9-9661-29442492BE36 - 2f9ab290d18aac7"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "main"
+                  moduleName = "CInt"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/aleksandrdremov/Desktop/%D0%9E%D0%B1%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5/%D0%9C%D0%A4%D0%A2%D0%98/%D0%A4%D0%9F%D0%9C%D0%98/%D0%9F%D1%80%D0%BE%D0%B3%D0%B0_2%20%D1%81%D0%B5%D0%BC/AsmMac/AsmTest/CDeclTest.c"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "18"
+                  endingLineNumber = "18"
+                  offsetFromSymbolStart = "20">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
+</Bucket>

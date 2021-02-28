@@ -43,6 +43,7 @@ rest macro regs ;; restore regs
 	endm
 endm
 
+
 Start:
 	; video mode
 	mov 	bl, 01h
@@ -53,6 +54,8 @@ Start:
 
 	mov 	si, ScreenFill
 	call	fillScreen
+	; consider not saving regs
+	; for efficency
 	
 	mov 	al, FrameRow
 	mov 	ah, FrameCol
@@ -112,6 +115,9 @@ retrieveFile proc
 	mov 	ah, 3Fh
 	int 	21h
 
+	mov 	ah, 3Eh	; close file
+	int 	21h
+
 	retrieveFileReturn:
 	rest <es, di, si, dx, cx, bx, ax>
 	ret
@@ -122,7 +128,9 @@ endp
 ; ================
 ; si source
 ; di destination
-ASCIIFname proc
+ASCIIFname proc ; 80h - length
+				; + whitespaces [beginning; ... ; end]
+				; direction flag
 	save <ax, di, si, es>
 	mov 	ax, ds
 	mov 	es, ax	; es = ds
@@ -443,7 +451,7 @@ printFrameRow proc
 	; middle pixels
 	save <ax, cx>
 	mov 	ax, bx
-	repe 	stosw
+	rep 	stosw ; 'repe' usually for flags
 	rest <cx, ax>
 	
 	; last pixel

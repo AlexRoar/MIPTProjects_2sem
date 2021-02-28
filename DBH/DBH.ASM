@@ -167,7 +167,24 @@ Start:
 ; cx - power
 ; di - string buffer
 printNumber proc
-	save <ax, bx, cx, di, dx>
+	save <ax, bx, cx, di, dx, si>
+	save <ax>
+	mov 	ax, cx
+	and 	ax, 1
+	xor 	si, si
+
+	cmp 	ax, 1
+	jne evenPrint
+	mov 	ax, bx
+	and 	ax, 8000h
+	cmp 	ax, 8000h
+	jne	noOverflowInPrnt 	
+	mov 	ax, '1'
+	stosb
+	noOverflowInPrnt:
+	shl 	bx, 1
+	evenPrint:
+	rest <ax>
 	save <ax>
 	xor 	dx, dx
 	mov 	ax, 16
@@ -194,7 +211,7 @@ printNumber proc
 	jne 	charByChar
 	mov 	ax, '$'
 	stosb
-	rest <dx, di, cx, bx, ax>
+	rest <si, dx, di, cx, bx, ax>
 	ret
 endp
 
@@ -204,17 +221,9 @@ endp
 ; ================
 ; dx - mask
 getUpperMask proc
-	xor 	dx, dx
-	save <cx, bx>
-	mov 	bx, 16
-	sub 	bx, cx
-	mov 	cx, bx
-	getMaskLoop:
-		shl 	dx, 1
-		inc 	dx
-	loop getMaskLoop
+	mov 	dx, 0FFFFh
+	shr 	dx, cl
 	not 	dx
-	rest <bx, cx>
 	ret
 endp
 
