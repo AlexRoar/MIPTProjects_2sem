@@ -43,8 +43,9 @@ section   .text
 ; ================
 _myprintf:
 	enter 0,0
-	mov 	r10, rcx
+	mov 	r10, rcx ; save to further restore
 	push rbx
+	
 	push rsi
 	mov 	rsi, rdi
 	mov 	rbx, '%'
@@ -53,7 +54,7 @@ _myprintf:
 	
 	sub 	rcx, 6
 	test 	rcx, rcx
-	js 	.stackPushed
+	js 	.stackPushed ; pushing to the stack from the end
 	mov 	rbx, rbp
 	add 	rbx, 16
 	shl		rcx, 3
@@ -67,13 +68,13 @@ _myprintf:
 	loop .loop
 	.stackPushed:
 
-	mov 	rcx, r10
-	push r9
-	push r8
-	push rcx
-	push rdx
-	push rsi
-	push rdi
+	mov 	rcx, r10 ; restore rcx
+	push 	r9
+	push 	r8
+	push 	rcx
+	push 	rdx
+	push 	rsi
+	push 	rdi
 	call printf
 	pop rbx
 	leave
@@ -89,7 +90,7 @@ _myprintf:
 ; %b - unsigned binary
 ; All other symbols are printed directly
 ; ================
-; Contaminated:
+; Contaminated: r9, r8, rdi, rsi, rcx, rax
 ; ================
 printf:
 	BufferSize equ 2
@@ -418,10 +419,10 @@ countChar:
 	xor 	rcx, rcx
 	.loop:
 		lodsb
-		or 	al, al
-		jz  	.loopEnd
+		cmp 	al, 0
+		je  	.loopEnd
 		
-		cmp 	rax, rbx
+		cmp 	al, bl
 		jne 	.continue
 		
 		inc 	rcx

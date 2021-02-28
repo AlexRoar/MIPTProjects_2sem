@@ -2,7 +2,7 @@ extern void myprintf(char* format, ...);
 
 
 int main(){
-    unsigned x = 16;
+    unsigned x = 912690;
     
     myprintf("%s %d is %h in hex?\n"
              "Even more. It's also %b and %o\n"
@@ -14,10 +14,11 @@ int main(){
              x,
              x,
              x,
-             "These params are passed in stack\n"
+             "These params are passed by stack\n"
              "as System V works this way:",
              x,
              x * 2,
              "\nCat.\n");
 }
+
 
