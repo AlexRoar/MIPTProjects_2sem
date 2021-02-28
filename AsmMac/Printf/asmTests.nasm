@@ -27,24 +27,24 @@ global    _main
 global    _myprintf
 
 
-	section   .text
+section   .text
 formatError 	db 10, "Wrong format string!", 10, 0
 formatErrorLen equ $ - formatError
 format 			db "%c adfad", 10, 0
 
 
-	section   .bss
+section   .bss
 numberBuffer	resb 33
 
 
-	section   .text
+section   .text
 
 ; Printf System V wrapper
 ; ================
 _myprintf:
 	enter 0,0
+	mov 	r10, rcx
 	push rbx
-	push rcx
 	push rsi
 	mov 	rsi, rdi
 	mov 	rbx, '%'
@@ -52,14 +52,22 @@ _myprintf:
 	pop  rsi
 	
 	sub 	rcx, 6
-	cmp 	rcx, 0
-	jbe 	.stackPushed
-	
-	rep push word [rbp + ArgNo(rcx)]
-	
+	test 	rcx, rcx
+	js 	.stackPushed
+	mov 	rbx, rbp
+	add 	rbx, 16
+	shl		rcx, 3
+	add 	rbx, rcx
+	shr		rcx, 3
+	inc 	rcx
+	.loop:
+		mov 	rax, [rbx]
+		sub		rbx, 8
+		push 	rax
+	loop .loop
 	.stackPushed:
-	pop  rcx
-	
+
+	mov 	rcx, r10
 	push r9
 	push r8
 	push rcx
@@ -84,32 +92,37 @@ _myprintf:
 ; Contaminated:
 ; ================
 printf:
-	BufferSize equ 16 * 5
+	BufferSize equ 2
 	enter BufferSize, 0
-	
+	%macro numberWrite 2
+		cmp 	al, %1
+		jne 	%%choiceCase
+		push rax
+		push rcx
+		push rdi
+		
+		mov 	rbx, [rbp + ArgNo(rcx)]
+		mov 	ecx, %2
+		mov 	rdi, numberBuffer
+		call 	printNumber
+		mov 	rsi, rdi
+		pop  rdi
+		push rdi
+		call 	bufferMannageStr
+		
+		pop  rdi
+		pop  rcx
+		pop  rax
+		jmp 	.processFurtherArg
+		%%choiceCase:
+	%endmacro
+
 	mov     r9, BufferSize		  ; max buffer size
 	xor 	r8, r8 			      ; current buffer size
 	lea 	rdi, [rsp] 		      ; buffer
 	mov 	rsi, [rbp + ArgNo(0)] ; format string
 	mov 	rcx, 1				  ; current argument
 
-	%macro numberWrite 2
-		cmp 	al, %1
-		jne 	%%choiceCase
-		push rax
-		push rdi
-		mov 	ebx, [rbp + ArgNo(rcx)]
-		mov 	ecx, %2
-		mov 	rdi, numberBuffer
-		call 	printNumber
-		mov 	rsi, rdi
-		mov 	rdi, [rsp]
-		call 	bufferMannageStr
-		pop  rdi
-		pop  rax
-		jmp 	.processFurtherArg
-		%%choiceCase:
-	%endmacro
 
 	.loop:
 		lodsb
@@ -124,7 +137,6 @@ printf:
 		cmp 	al, 's'
 		jne 	.choiceCase2
 		mov 	rsi, [rbp + ArgNo(rcx)]
-
 		push 	rcx
 		call 	bufferMannageStr
 		pop 	rcx
@@ -137,25 +149,30 @@ printf:
 		call 	bufferMannage
 		jmp 	.processFurtherArg
 		.choiceCase3:
-		
-		numberWrite 'b', 1
-		numberWrite 'o', 3
-		numberWrite 'h', 4
 
 		cmp 	al, 'd'
-		jne 	.choiceCase5
+		jne 	.choiceCase7
 		push rax
 		push rdi
+		push rcx
+		push rdx
+		push 	rdi
 		mov 	eax, [rbp + ArgNo(rcx)]
 		mov 	rdi, numberBuffer
 		call 	printDecimalNumber
+		pop 	rdi
 		mov 	rsi, numberBuffer
-		mov 	rdi, [rsp]
 		call 	bufferMannageStr
+		pop  rdx
+		pop  rcx
 		pop  rdi
 		pop  rax
 		jmp 	.processFurtherArg
-		.choiceCase5:
+		.choiceCase7:
+
+		numberWrite 'b', 1
+		numberWrite 'o', 3
+		numberWrite 'h', 4
 		
 		mov		rdi, formatError
 		mov		r8, formatErrorLen
@@ -216,6 +233,7 @@ bufferMannage:
 	cmp 	r8, r9
 	jb	 	.processAdd
 
+	push rcx
 	push rax
 	push rdi
 	push rsi
@@ -230,7 +248,7 @@ bufferMannage:
 	pop rsi
 	pop rdi
 	pop rax
-
+	pop rcx
 	.processAdd:
 	mov 	byte [rdi + r8], al
 	inc 	r8
@@ -368,10 +386,10 @@ getUpperMask:
 ; (c) eax - number
 ; (c) rdi - string buffer
 ; ================
-; Contaminated: ecx, edx, eax, rdi
+; Contaminated: rcx, rdx, rax, rdi
 ; ================
 printDecimalNumber:
-	enter 0, 15
+	enter 0, 0
 	push rax
 	push rdx
 	xor 	edx, edx
