@@ -24,13 +24,30 @@ IntSize 	equ 32
 ByteSize 	equ 8
 
 global    _main
+extern    _sum
 global    _myprintf
+global    _sumWrapper
 
 
 section   .text
 formatError 	db 10, "Wrong format string!", 10, 0
-formatErrorLen equ $ - formatError
-format 			db "%c adfad", 10, 0
+formatErrorLen  equ $ - formatError
+; o    x   d   c    s   b   %
+; 111 120 100  99  115  98  37
+; 98 - 120
+printfJmpTable:
+		times 37 dq printf.formatError
+				 dq printf.simplePrint
+		times 60 dq printf.formatError
+				 dq printf.printBinary
+				 dq printf.printChar
+				 dq printf.printDecimal
+		times 10 dq printf.formatError
+				 dq printf.printOctal
+		times 3  dq printf.formatError
+			     dq printf.printString
+		times 4  dq printf.formatError
+				 dq printf.printHex
 
 
 section   .bss
@@ -39,12 +56,21 @@ numberBuffer	resb 33
 
 section   .text
 
+; Sum System V wrapper
+; ================
+_sumWrapper:
+	enter 0, 0
+	call	_sum
+	leave
+	ret
+	
+
 ; Printf System V wrapper
 ; ================
 _myprintf:
 	enter 0,0
+	mov 	r11, rbx
 	mov 	r10, rcx ; save to further restore
-	push rbx
 	
 	push rsi
 	mov 	rsi, rdi
@@ -69,6 +95,8 @@ _myprintf:
 	.stackPushed:
 
 	mov 	rcx, r10 ; restore rcx
+
+	; System V pushes
 	push 	r9
 	push 	r8
 	push 	rcx
@@ -76,7 +104,7 @@ _myprintf:
 	push 	rsi
 	push 	rdi
 	call printf
-	pop rbx
+	mov 	rbx, r11
 	leave
 	ret
 
@@ -93,11 +121,12 @@ _myprintf:
 ; Contaminated: r9, r8, rdi, rsi, rcx, rax
 ; ================
 printf:
-	BufferSize equ 2
+	BufferSize equ 256
 	enter BufferSize, 0
+	push 	rbx
+
+	; Print number using printNumber()
 	%macro numberWrite 2
-		cmp 	al, %1
-		jne 	%%choiceCase
 		push rax
 		push rcx
 		push rdi
@@ -109,13 +138,12 @@ printf:
 		mov 	rsi, rdi
 		pop  rdi
 		push rdi
-		call 	bufferMannageStr
+		call 	bufferManageStr
 		
 		pop  rdi
 		pop  rcx
 		pop  rax
 		jmp 	.processFurtherArg
-		%%choiceCase:
 	%endmacro
 
 	mov     r9, BufferSize		  ; max buffer size
@@ -129,30 +157,32 @@ printf:
 		lodsb
 		cmp 	al, 0
 		je 		.loopEnd
-
+		push 	rsi
 		cmp 	al, '%'
 		jne 	.simplePrint
+
+		xor 	rax, rax
+		pop 	rsi
 		lodsb
 		push 	rsi
+		mov 	rbx, printfJmpTable
+		jmp		[rax * 8 + rbx]
+		
 
-		cmp 	al, 's'
-		jne 	.choiceCase2
+		
+		.printString:
 		mov 	rsi, [rbp + ArgNo(rcx)]
 		push 	rcx
-		call 	bufferMannageStr
+		call 	bufferManageStr
 		pop 	rcx
 		jmp 	.processFurtherArg
-		.choiceCase2:
 
-		cmp 	al, 'c'
-		jne 	.choiceCase3
+		.printChar:
 		mov  	rax, [rbp + ArgNo(rcx)]
-		call 	bufferMannage
+		call 	bufferManage
 		jmp 	.processFurtherArg
-		.choiceCase3:
 
-		cmp 	al, 'd'
-		jne 	.choiceCase7
+		.printDecimal:
 		push rax
 		push rdi
 		push rcx
@@ -163,24 +193,29 @@ printf:
 		call 	printDecimalNumber
 		pop 	rdi
 		mov 	rsi, numberBuffer
-		call 	bufferMannageStr
+		call 	bufferManageStr
 		pop  rdx
 		pop  rcx
 		pop  rdi
 		pop  rax
 		jmp 	.processFurtherArg
-		.choiceCase7:
 
+		.printBinary:
 		numberWrite 'b', 1
+		.printOctal:
 		numberWrite 'o', 3
-		numberWrite 'h', 4
+		.printHex:
+		numberWrite 'x', 4
 		
+		.formatError:
 		mov		rdi, formatError
 		mov		r8, formatErrorLen
+		pop 	rsi
 		jmp 	.loopEnd
 
 		.simplePrint:
-		call 	bufferMannage
+		call 	bufferManage
+		pop 	rsi
 		jmp 	.processFurther
 		.processFurtherArg:
 		pop 	rsi
@@ -194,6 +229,7 @@ printf:
 	mov		rdi, 1
 	mov		rdx, r8
 	syscall
+	pop 	rbx
 	leave
 	ret
 
@@ -208,13 +244,13 @@ printf:
 ; r9  - max size
 ; ================
 ; r8  - new size
-bufferMannageStr:
+bufferManageStr:
 	push 	rax
 	.loop:
 		lodsb
 		cmp 	al, 0
 		je 		.loopEnd
-		call 	bufferMannage
+		call 	bufferManage
 	jmp .loop
 	.loopEnd:
 	pop 	rax
@@ -230,7 +266,7 @@ bufferMannageStr:
 ; r9  - max size
 ; ================
 ; r8  - new size
-bufferMannage:
+bufferManage:
 	cmp 	r8, r9
 	jb	 	.processAdd
 
