@@ -36,18 +36,15 @@ formatErrorLen  equ $ - formatError
 ; 111 120 100  99  115  98  37
 ; 98 - 120
 printfJmpTable:
-		times 37 dq printf.formatError
-				 dq printf.simplePrint
-		times 60 dq printf.formatError
-				 dq printf.printBinary
-				 dq printf.printChar
-				 dq printf.printDecimal
+				 dq printf.printBinary ; b
+				 dq printf.printChar   ; c
+				 dq printf.printDecimal; d
 		times 10 dq printf.formatError
-				 dq printf.printOctal
+				 dq printf.printOctal  ; o
 		times 3  dq printf.formatError
-			     dq printf.printString
+			     dq printf.printString ; s
 		times 4  dq printf.formatError
-				 dq printf.printHex
+				 dq printf.printHex    ; x
 
 
 section   .bss
@@ -165,10 +162,15 @@ printf:
 		pop 	rsi
 		lodsb
 		push 	rsi
-		mov 	rbx, printfJmpTable
+		cmp 	al, '%'
+		jl 		.formatError
+		cmp 	al, '%'
+		je 		.simplePrint
+		cmp 	al, 'x'
+		jg 		.formatError
+		mov 	rbx, printfJmpTable - 8 * 'b'
 		jmp		[rax * 8 + rbx]
 		
-
 		
 		.printString:
 		mov 	rsi, [rbp + ArgNo(rcx)]
